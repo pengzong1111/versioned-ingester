@@ -1,6 +1,7 @@
 package edu.indiana.d2i.zong.ingest.util;
 
 import edu.indiana.d2i.zong.ingest.util.METSParser.VolumeRecord;
+import edu.indiana.d2i.zong.ingest.util.Statistics.Source;
 import edu.indiana.d2i.zong.ingest.version.Constants;
 import gov.loc.repository.pairtree.Pairtree;
 
@@ -14,10 +15,14 @@ import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -104,7 +109,7 @@ public class Tools {
 	 */
 	public static File getFileFromPairtree(String relativePairtreePath, String fileName) {
 		// for each vm-named directory, see if this file is under it
-		for(HtrcVM vm : HtrcVM.values()){
+		/*for(HtrcVM vm : HtrcVM.values()){
 			StringBuilder absolutePathBuilder = new StringBuilder();
 			absolutePathBuilder.append(Constants.ROOT_PATH).append(Constants.SEPERATOR)
 			.append(vm).append(Constants.SEPERATOR).append(Constants.TO_PAIRTREE_PATH)
@@ -116,6 +121,17 @@ public class Tools {
 				return file;
 			}
 			//System.out.println(absolutePathBuilder.toString());
+		}
+		return null;*/
+		StringBuilder absolutePathBuilder = new StringBuilder();
+		//ROOT_PATH is something like "/N/dc2/projects/htrc/data/ht_text"
+		absolutePathBuilder.append(Configuration.getProperty("ROOT_PATH")/*Constants.ROOT_PATH*/).append(Constants.SEPERATOR)
+		.append(relativePairtreePath).append(Constants.SEPERATOR)
+		.append(fileName); 
+//		System.out.println("!!!!!!!!!!!!!!!!"+absolutePathBuilder.toString());
+		File file = new File(absolutePathBuilder.toString());
+		if(file.exists()){ // if exist, return this file instantly
+			return file;
 		}
 		return null;
 	}
@@ -221,4 +237,104 @@ public class Tools {
 		// TODO Auto-generated method stub
 		return "";
 	}
+
+	public static List<String> getStats(String id, Source src) {
+		String cleanId = Tools.cleanId(id);
+		String pairtreePath = Tools.getPairtreePath(id);
+		
+		String cleanIdPart = cleanId.split("\\.", 2)[1];
+		String zipFileName = cleanIdPart  + Constants.VOLUME_ZIP_SUFFIX; // e.g.: ark+=13960=t02z18p54.zip
+		String metsFileName = cleanIdPart + Constants.METS_XML_SUFFIX; // e.g.: ark+=13960=t02z18p54.mets.xml
+		File zipFile = null;
+		File metsFile = null;
+		if(src == Source.htmnt) {
+			for(HtrcVM vm : HtrcVM.values()){
+				StringBuilder absolutePathBuilder1 = new StringBuilder();
+				absolutePathBuilder1.append("/hathitrustmnt").append(Constants.SEPERATOR)
+				.append(vm).append(Constants.SEPERATOR).append(Constants.TO_PAIRTREE_PATH)
+				.append(Constants.SEPERATOR).append(pairtreePath).append(Constants.SEPERATOR)
+				.append(zipFileName); 
+				StringBuilder absolutePathBuilder2 = new StringBuilder();
+				absolutePathBuilder2.append("/hathitrustmnt").append(Constants.SEPERATOR)
+				.append(vm).append(Constants.SEPERATOR).append(Constants.TO_PAIRTREE_PATH)
+				.append(Constants.SEPERATOR).append(pairtreePath).append(Constants.SEPERATOR)
+				.append(metsFileName); 
+				zipFile = new File(absolutePathBuilder1.toString());
+				metsFile = new File(absolutePathBuilder2.toString());
+				if(zipFile.exists() && metsFile.exists()) {
+					break;
+				}
+				//System.out.println(absolutePathBuilder.toString());
+			}
+		} else if(src == Source.ht_text) {
+			StringBuilder absolutePathBuilder1 = new StringBuilder();
+			absolutePathBuilder1.append("/N/dc2/projects/htrc/data/ht_text").append(Constants.SEPERATOR)
+			.append(pairtreePath).append(Constants.SEPERATOR)
+			.append(zipFileName); 
+			StringBuilder absolutePathBuilder2 = new StringBuilder();
+			absolutePathBuilder2.append("/N/dc2/projects/htrc/data/ht_text").append(Constants.SEPERATOR)
+			.append(pairtreePath).append(Constants.SEPERATOR)
+			.append(metsFileName);
+//			System.out.println("!!!!!!!!!!!!!!!!"+absolutePathBuilder.toString());
+			zipFile = new File(absolutePathBuilder1.toString());
+			metsFile = new File(absolutePathBuilder2.toString());
+		} else if(src == Source.full_set) {
+			StringBuilder absolutePathBuilder1 = new StringBuilder();
+			absolutePathBuilder1.append("/N/dc2/projects/htrc/data/full_set").append(Constants.SEPERATOR)
+			.append(pairtreePath).append(Constants.SEPERATOR)
+			.append(zipFileName); 
+			StringBuilder absolutePathBuilder2 = new StringBuilder();
+			absolutePathBuilder2.append("/N/dc2/projects/htrc/data/full_set").append(Constants.SEPERATOR)
+			.append(pairtreePath).append(Constants.SEPERATOR)
+			.append(zipFileName); 
+//			System.out.println("!!!!!!!!!!!!!!!!"+absolutePathBuilder.toString());
+			zipFile = new File(absolutePathBuilder1.toString());
+			metsFile = new File(absolutePathBuilder2.toString());
+		}
+		
+		if(zipFile.exists() && metsFile.exists()){ // if exist, return this file instantly
+			try {
+				return extractStats(zipFile, metsFile);
+			} catch (FileNotFoundException e) {
+				System.out.println("file not found： " + e.getMessage());
+				return null;
+			}
+		} else {
+			System.out.println("not file found for " + zipFile.getAbsolutePath() + " with source " + src);
+			return null;
+		} 
+	}
+
+	private static List<String> extractStats(File zipFile, File metsFile) throws FileNotFoundException {
+		List<String> res = new LinkedList<String>();
+		long size = zipFile.length();
+		res.add(String.valueOf(size));
+		Date date=new Date(zipFile.lastModified());
+        SimpleDateFormat df2 = new SimpleDateFormat("yyyyMMdd");
+        String dateText = df2.format(date);
+        res.add(dateText);
+		ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+		
+		int pageCount = 0;
+		try {
+			ZipEntry entry = null;
+			while((entry = zis.getNextEntry()) != null) {
+				String entryName = entry.getName();
+				String entryFilename = extractEntryFilename(entryName);
+				if(entryFilename != null && !entryFilename.equals("")) {
+					pageCount ++;
+				}
+			}
+			res.add(String.valueOf(pageCount));
+			zis.close();
+		} catch (IOException e) {
+			System.out.println("ioexception: " + e.getMessage());
+		}
+		return res;
+	}
+	public static String extractEntryFilename(String entryName) {
+        int lastIndex = entryName.lastIndexOf('/');
+        return entryName.substring(lastIndex + 1);
+    }
+	
 }

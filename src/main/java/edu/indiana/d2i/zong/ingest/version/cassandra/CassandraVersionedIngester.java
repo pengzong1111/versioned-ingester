@@ -42,6 +42,7 @@ public class CassandraVersionedIngester extends VersionedIngester{
 	private PrintWriter pwMismatchedSequence;
 	private PrintWriter pwLabelMismatch;
 	private PrintWriter pwX;
+	private PrintWriter pwStats;
 	private CassandraManager cassandraManager;
 	private String columnFamilyName;
 	private int VERSION_NO;
@@ -75,6 +76,7 @@ public class CassandraVersionedIngester extends VersionedIngester{
 			pwMismatchedSequence = new PrintWriter("mismatchedPageSeq.txt");
 			pwLabelMismatch = new PrintWriter("misMatchedLabel.txt");
 			pwX = new PrintWriter("baseVersionErrors.txt");
+			pwStats = new PrintWriter("stats.txt");
 		} catch (FileNotFoundException e) {
 			log.error("error creating printwriter for checksum verification", e.getMessage());
 		}
@@ -85,6 +87,7 @@ public class CassandraVersionedIngester extends VersionedIngester{
 		pwHasDiff.close();
 		pwLabelMismatch.close();
 		pwMismatchedSequence.close();
+		pwStats.close();
 		cassandraManager.shutdown();
 	}
 
@@ -243,6 +246,7 @@ public class CassandraVersionedIngester extends VersionedIngester{
 							.value("version", VERSION_NO)
 							.value("sequence", pageRecord.getSequence())
 							.value("isBase", true)
+							.value("isRemoved", false)
 							.value("byteCount", pageRecord.getByteCount())
 							.value("characterCount", pageRecord.getCharacterCount())
 							.value("contents", pageContentsString)
@@ -260,10 +264,11 @@ public class CassandraVersionedIngester extends VersionedIngester{
 							String originalLabel = contentLabelPair[1];
 							if(originalLabel == null && pageRecord.getLabel() == null) {
 								System.out.println("label null for both original and current: " + volumeId + "#" + pageRecord.getSequence() );
+								pwX.println("label null for both original and current: " + volumeId + "#" + pageRecord.getSequence() ); pwX.flush();
 							} else if ((originalLabel == null && pageRecord.getLabel() != null)
 									|| (originalLabel != null && pageRecord.getLabel() == null) 
 									||!originalLabel.equals(pageRecord.getLabel())) {
-								pwLabelMismatch.println(volumeId + "#" + pageRecord.getSequence());
+								pwLabelMismatch.println(volumeId + "#" + pageRecord.getSequence() + " old: " + originalLabel + " new: " + pageRecord.getLabel());
 								pwLabelMismatch.flush();
 								return false;
 							}
@@ -277,12 +282,16 @@ public class CassandraVersionedIngester extends VersionedIngester{
 							.value("version", VERSION_NO)
 							.value("sequence", pageRecord.getSequence())
 							.value("isBase", false)
+							.value("isRemoved", false)
 							.value("byteCount", pageRecord.getByteCount())
 							.value("characterCount", pageRecord.getCharacterCount())
 							.value("contents", diffText)
 							.value("checksum", pageRecord.getChecksum())
 							.value("checksumType", pageRecord.getChecksumType())
 							.value("pageNumberLabel", pageRecord.getLabel());
+							
+							pwStats.println(volumeId + "\t" + pageRecord.getSequence() + "\t" + originalText.getBytes().length + "\t" + pageContentsString.getBytes().length + '\t' + diffText.getBytes().length);
+							pwStats.flush();
 						}
 						
 						batchStmt.add(insertStmt);
@@ -297,13 +306,13 @@ public class CassandraVersionedIngester extends VersionedIngester{
 				if (firstPageInsert != null) {
 					//ByteBuffer zipBinaryContent = getByteBuffer(volumeZipFile);
 					if(baseVersion == -1) {
-						firstPageInsert.value("isRemoved", false)
+						firstPageInsert//.value("isRemoved", false)
 				    //	.value("isBase", true)
 						.value("baseVersion", VERSION_NO)
 						.value("volumeByteCount", volumeByteCount)
 						.value("volumeCharacterCount", volumeCharacterCount);
 					} else {
-						firstPageInsert.value("isRemoved", false)
+						firstPageInsert//.value("isRemoved", false)
 					//	.value("isBase", false)
 						//.value("baseVersion", baseVersion)
 						.value("volumeByteCount", volumeByteCount)
@@ -326,7 +335,7 @@ public class CassandraVersionedIngester extends VersionedIngester{
 	}
 	
 	private int baseVersion(String volumeId) throws UnexpectedResultSizeException {
-		Statement select = QueryBuilder.select().column("volumeid").column("version")
+		Statement select = QueryBuilder.select()/*.column("volumeid")*/.column("version")
 				.from(cassandraManager.getKeySpace(), columnFamilyName)
 				.where(QueryBuilder.eq("volumeid", volumeId))
 				.and(QueryBuilder.eq("isBase", true))
