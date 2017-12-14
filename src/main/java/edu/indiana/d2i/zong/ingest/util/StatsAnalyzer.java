@@ -13,16 +13,20 @@ import java.util.Map;
 public class StatsAnalyzer {
 
 	public static void main(String[] args) throws IOException {
-		File oldStatsFile = new File("stats-compare/full-set-stats.txt");
-		File newStatsFile = new File("stats-compare/ht-text-stats.txt");
+	//	File oldStatsFile = new File("C:/Users/zongpeng/Documents/stats-ht_text.txt");
+	//	File newStatsFile = new File("C:/Users/zongpeng/Documents/stats-silvermaple.txt");
+		File oldStatsFile = new File(args[0]);
+		File newStatsFile = new File(args[1]);
 		
 		Map<String, Map<String, String>> volumeIdToStatsMapOld = new HashMap<String, Map<String, String>>();
 		Map<String, Map<String, String>> volumeIdToStatsMapNew = new HashMap<String, Map<String, String>>();
 		
 		loadStats(oldStatsFile, volumeIdToStatsMapOld);
 		loadStats(newStatsFile, volumeIdToStatsMapNew);
-		PrintWriter pw = new PrintWriter("volumesWithSamePageNumber.txt");
+		System.out.println("files loaded");
+		PrintWriter pw = new PrintWriter("volumesWithSamePageCount.txt");
 		PrintWriter idPw = new PrintWriter("ids.txt");
+		PrintWriter pwDiffSize = new PrintWriter("volumesWithSamePageCountDiffSize.txt");
 		for(String id : volumeIdToStatsMapNew.keySet()) {
 			if(volumeIdToStatsMapOld.containsKey(id)) {
 				int oldPageCount = Integer.valueOf(volumeIdToStatsMapOld.get(id).get("pageCount"));
@@ -32,14 +36,22 @@ public class StatsAnalyzer {
 					pw.flush();
 					idPw.println(id);
 					idPw.flush();
+					int oldSize = Integer.valueOf(volumeIdToStatsMapOld.get(id).get("size"));
+					int newSize = Integer.valueOf(volumeIdToStatsMapNew.get(id).get("size"));
+					if(oldSize != newSize) {
+						pwDiffSize.println(id);
+						pwDiffSize.flush();
+					}
 				}
 			}
 		}
 		pw.flush();idPw.flush();
 		pw.close();idPw.close();
+		pwDiffSize.flush(); pwDiffSize.close();
 	}
 
 	private static void loadStats(File statsFile, Map<String, Map<String, String>> volumeIdToStatsMap) throws IOException {
+		System.out.println("loading " + statsFile.getAbsolutePath());
 		BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(statsFile)));
 		String line = null;
 		while((line = br.readLine()) != null) {

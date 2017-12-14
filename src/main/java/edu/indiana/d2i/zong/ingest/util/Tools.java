@@ -305,6 +305,7 @@ public class Tools {
 		} 
 	}
 
+	//get id, size, date and page count
 	private static List<String> extractStats(File zipFile, File metsFile) throws FileNotFoundException {
 		List<String> res = new LinkedList<String>();
 		long size = zipFile.length();
