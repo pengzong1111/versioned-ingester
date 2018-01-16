@@ -12,7 +12,7 @@ import java.util.List;
  */
 public class Statistics {
     enum Source {
-    	full_set, ht_text, htmnt;
+    	full_set, ht_text, htmnt, dir;
     }
     
     private static Source src;
@@ -48,7 +48,7 @@ public class Statistics {
 	}
 	
 	public static void main(String[] args) throws FileNotFoundException {
-		List<String> volumeIds = Tools.getVolumeIds(new File("ids.txt"));
+		List<String> volumeIds = Tools.getVolumeIds(new File(args[1]));
 		src = Source.valueOf(args[0]);
 		collectStats(volumeIds);
 	}

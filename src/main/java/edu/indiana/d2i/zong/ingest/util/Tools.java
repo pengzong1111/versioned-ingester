@@ -290,9 +290,15 @@ public class Tools {
 //			System.out.println("!!!!!!!!!!!!!!!!"+absolutePathBuilder.toString());
 			zipFile = new File(absolutePathBuilder1.toString());
 			metsFile = new File(absolutePathBuilder2.toString());
+		} else if(src == Source.dir) {
+			String commonPath = "/N/dc2/projects/htrc/zongpeng/data/version-20171130"; //"/home/zong/ht_text_sample/data0";
+			log.info("dir " + cleanIdPart);
+			File volumeDir = new File(commonPath, cleanIdPart);
+			zipFile = new File(volumeDir, zipFileName);
+			metsFile = new File(volumeDir, metsFileName);
 		}
 		
-		if(zipFile.exists() && metsFile.exists()){ // if exist, return this file instantly
+		if(zipFile != null && zipFile.exists() && metsFile != null && metsFile.exists()){ // if exist, return this file instantly
 			try {
 				return extractStats(zipFile, metsFile);
 			} catch (FileNotFoundException e) {
