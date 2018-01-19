@@ -1,9 +1,12 @@
 package edu.indiana.d2i.zong.ingest.util;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.util.LinkedList;
@@ -45,6 +48,16 @@ public class MyersDiffTool {
 	}
 	
 	
+	static PrintWriter pw ;
+	
+	static {
+		try {
+			pw = new PrintWriter("delta-count-per-page.txt");
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	
 	/**
 	 * get the diff between originalText and revisedText
 	 * @param originalText
@@ -56,6 +69,30 @@ public class MyersDiffTool {
 		List<String> revisedLines = stringTextToLines(revisedText);
 		Patch patch = DiffUtils.diff(originalLines, revisedLines);
 		List<String> diffStrs = DiffUtils.generateUnifiedDiff("original.txt", "revise.txt", originalLines, patch, 0);
+		
+		int size = 0;
+		int diffCount =  patch.getDeltas().size();
+		/*for(Delta delta : patch.getDeltas()) {
+			System.out.println(delta.getOriginal().toString());
+			size += delta.getOriginal().toString().getBytes().length;
+			System.out.println(delta.getRevised().toString());
+			size += delta.getRevised().toString().getBytes().length;
+			diffCount++;
+		}*/
+		if(diffCount != 0) {
+			pw.println(diffCount); pw.flush();
+		}
+		
+		//System.out.println("raw delta bytes: " + size);
+		/*SerializedPatch serializedPatch = new SerializedPatch(patch);
+		try {
+			ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("patch.txt"));
+			oos.writeObject(serializedPatch);
+			oos.flush();oos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}*/
+
 	    StringBuilder sb = new StringBuilder();
 	    for(int i=0; i<diffStrs.size(); i++) {
 	    	sb.append(diffStrs.get(i));
@@ -100,8 +137,8 @@ public class MyersDiffTool {
 	}
 	
 	public static void main(String[] args) throws PatchFailedException, FileNotFoundException {
-		List<String> original = fileToLines("/home/zong/in.txt");
-        List<String> revised  = fileToLines("/home/zong/in2.txt");
+		List<String> original = fileToLines("C:/zong/new-00000793.txt");
+        List<String> revised  = fileToLines("C:/zong/old-00000793.txt");
         String originalText = concat(original);
         String revisedText = concat(revised);
         String diffStr = getDiffString(originalText, revisedText);
@@ -110,6 +147,11 @@ public class MyersDiffTool {
         System.out.println(diffStr);
         System.out.println("-----------------------");
         System.out.println(recoveredRevisedText);
+        
+        System.out.println("originalText bytes: " + originalText.getBytes().length);
+        System.out.println("revisedText bytes: " + revisedText.getBytes().length);
+        System.out.println("delta bytes: " + diffStr.getBytes().length);
+     //   System.out.println(diffStr);
 		/*
 		List<String> original = fileToLines("/home/zong/license.txt");
         List<String> revised  = fileToLines("/home/zong/revised-lic.txt");
